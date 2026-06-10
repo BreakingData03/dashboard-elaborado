@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LogiTrack - Dashboard de Monitorização Logística</title>
+    <!-- Tailwind CSS para um design moderno e responsivo -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js para geração de gráficos estatísticos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Lucide Icons para elementos visuais sofisticados -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 min-h-screen flex flex-col">
+
+    <!-- Header / Barra de Navegação -->
+    <header class="bg-indigo-900 text-white shadow-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="bg-indigo-600 p-2 rounded-lg text-white">
+                    <i data-lucide="truck" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight">LogiTrack</h1>
+                    <p class="text-xs text-indigo-200">Painel de Controlo de Atrasos Logísticos</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <span id="date-time" class="text-sm text-indigo-200 hidden md:inline-block"></span>
+                <span class="bg-indigo-800 text-indigo-200 text-xs font-semibold px-3 py-1.5 rounded-full border border-indigo-700 flex items-center gap-1.5">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    Tempo Real Ativo
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Conteúdo Principal -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- Secção de Alertas Rápidos de Priorização (Graves) -->
+        <div id="critical-alerts" class="hidden bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg shadow-sm">
+            <div class="flex items-start">
+                <div class="flex-shrink-0 text-red-500">
+                    <i data-lucide="alert-octagon" class="w-6 h-6"></i>
+                </div>
+                <div class="ml-3 flex-1">
+                    <h3 class="text-sm font-semibold text-red-800">Alertas de Atenção Crítica (Atraso Significativo)</h3>
+                    <div id="alerts-list" class="mt-2 text-xs text-red-700 space-y-1">
+                        <!-- Alertas inseridos dinamicamente por JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filtros e Controlo de Simulação -->
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4">
+            <div class="flex flex-wrap items-center gap-4">
+                <!-- Filtro de Transportadora -->
+                <div class="w-full sm:w-48">
+                    <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Transportadora</label>
+                    <select id="filter-carrier" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option value="all">Todas as Empresas</option>
+                        <option value="RotaMax">RotaMax</option>
+                        <option value="ViaCargo">ViaCargo</option>
+                        <option value="FlashLog">FlashLog</option>
+                    </select>
+                </div>
+                <!-- Filtro de Região -->
+                <div class="w-full sm:w-48">
+                    <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Região</label>
+                    <select id="filter-region" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option value="all">Todas as Regiões</option>
+                        <option value="Sudeste">Sudeste</option>
+                        <option value="Sul">Sul</option>
+                        <option value="Nordeste">Nordeste</option>
+                        <option value="Norte">Norte</option>
+                        <option value="Centro-Oeste">Centro-Oeste</option>
+                    </select>
+                </div>
+                <!-- Filtro de Estado -->
+                <div class="w-full sm:w-48">
+                    <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Estado da Entrega</label>
+                    <select id="filter-status" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option value="all">Todos os Estados</option>
+                        <option value="delayed">Em Atraso</option>
+                        <option value="ontime">No Prazo</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Botão para Adicionar Nova Entrega (Simulador de Tempo Real) -->
+            <button onclick="openModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2.5 rounded-lg transition-all duration-150 flex items-center justify-center gap-2 shadow-sm">
+                <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                Simular Nova Entrega
+            </button>
+        </div>
+
+        <!-- Indicadores de Atraso (KPI Cards) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            <!-- Total de Entregas -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total de Entregas</p>
+                    <h3 id="kpi-total" class="text-3xl font-bold mt-1">0</h3>
+                    <p class="text-xs text-gray-500 mt-1">Consolidadas na base</p>
+                </div>
+                <div class="bg-blue-50 p-3 rounded-xl text-blue-600">
+                    <i data-lucide="package" class="w-8 h-8"></i>
+                </div>
+            </div>
+
+            <!-- Entregas em Atraso -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Entregas em Atraso</p>
+                    <h3 id="kpi-delayed" class="text-3xl font-bold text-red-600 mt-1">0</h3>
+                    <p id="kpi-delayed-pct" class="text-xs text-red-500 mt-1 font-medium">0% do total</p>
+                </div>
+                <div class="bg-red-50 p-3 rounded-xl text-red-600">
+                    <i data-lucide="clock-alert" class="w-8 h-8"></i>
+                </div>
+            </div>
+
+            <!-- Taxa de Pontualidade -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Taxa de Pontualidade</p>
+                    <h3 id="kpi-ontime" class="text-3xl font-bold text-emerald-600 mt-1">0%</h3>
+                    <p class="text-xs text-gray-500 mt-1">Entregas dentro do prazo</p>
+                </div>
+                <div class="bg-emerald-50 p-3 rounded-xl text-emerald-600">
+                    <i data-lucide="check-circle" class="w-8 h-8"></i>
+                </div>
+            </div>
+
+            <!-- Média de Atraso Geral -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Média de Desvio</p>
+                    <h3 id="kpi-avg-delay" class="text-3xl font-bold text-amber-600 mt-1">0d</h3>
+                    <p class="text-xs text-gray-500 mt-1">Diferença média (real vs prazo)</p>
+                </div>
+                <div class="bg-amber-50 p-3 rounded-xl text-amber-600">
+                    <i data-lucide="hourglass" class="w-8 h-8"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Secção de Gráficos de Apoio Analítico -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Desempenho por Transportadora -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col h-[380px]">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-bold text-gray-800 flex items-center gap-2">
+                        <i data-lucide="bar-chart-3" class="w-5 h-5 text-indigo-500"></i>
+                        Atrasos Médios por Transportadora
+                    </h3>
+                    <span class="text-xs text-gray-400">Dias de desvio (Real - Prazo)</span>
+                </div>
+                <div class="flex-grow relative">
+                    <canvas id="chart-carriers"></canvas>
+                </div>
+            </div>
+
+            <!-- Volume e Situação por Região -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col h-[380px]">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-bold text-gray-800 flex items-center gap-2">
+                        <i data-lucide="pie-chart" class="w-5 h-5 text-indigo-500"></i>
+                        Estado das Entregas por Região
+                    </h3>
+                    <span class="text-xs text-gray-400">Quantidade cumulativa</span>
+                </div>
+                <div class="flex-grow relative">
+                    <canvas id="chart-regions"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rankings de Desempenho Operacional -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Ranking de Transportadoras Críticas -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <i data-lucide="trending-up" class="w-5 h-5 text-red-500"></i>
+                    Índice de Atrasos por Transportadora
+                </h3>
+                <div class="space-y-4" id="carrier-ranking-list">
+                    <!-- Gerado dinamicamente -->
+                </div>
+            </div>
+
+            <!-- Regiões Críticas - Termómetro Visual -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <i data-lucide="map-pin" class="w-5 h-5 text-amber-500"></i>
+                    Severidade do Atraso por Região
+                </h3>
+                <div class="space-y-4" id="region-severity-list">
+                    <!-- Gerado dinamicamente -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabela Dinâmica de Entregas -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="p-5 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h3 class="font-bold text-gray-800 flex items-center gap-2">
+                        <i data-lucide="list" class="w-5 h-5 text-indigo-500"></i>
+                        Monitorização de Entregas Ativas
+                    </h3>
+                    <p class="text-xs text-gray-500 mt-1">Lista detalhada com destaques automáticos e ordenação de prazos</p>
+                </div>
+                <div class="flex items-center gap-2 w-full sm:w-auto">
+                    <div class="relative w-full sm:w-64">
+                        <input type="text" id="table-search" placeholder="Procurar ID, transportadora..." class="w-full bg-gray-50 border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3 top-3"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm border-collapse">
+                    <thead class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
+                        <tr>
+                            <th class="px-6 py-4 font-semibold">ID</th>
+                            <th class="px-6 py-4 font-semibold">Transportadora</th>
+                            <th class="px-6 py-4 font-semibold">Região</th>
+                            <th class="px-6 py-4 font-semibold text-center">Prazo Estabelecido</th>
+                            <th class="px-6 py-4 text-center font-semibold">Dias Reais</th>
+                            <th class="px-6 py-4 text-center font-semibold">Diferença</th>
+                            <th class="px-6 py-4 font-semibold">Estado</th>
+                            <th class="px-6 py-4 text-right font-semibold">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="deliveries-table-body" class="divide-y divide-gray-100">
+                        <!-- Linhas da tabela populadas dinamicamente -->
+                    </tbody>
+                </table>
+            </div>
+            <div class="bg-gray-50 px-6 py-4 border-t border-gray-100 flex justify-between items-center text-xs text-gray-500">
+                <span id="table-counter">A mostrar 10 de 10 registos</span>
+                <span>Destaques: <span class="inline-block w-2.5 h-2.5 rounded bg-red-100 border border-red-300 mr-1 ml-2"></span> Atraso Crítico (> 3 dias)</span>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Rodapé Informativo -->
+    <footer class="bg-gray-900 text-gray-400 text-xs py-6 mt-12 border-t border-gray-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div>
+                <p class="font-medium text-gray-300">LogiTrack Dashboard - Ciência de Dados & Logística Nacional</p>
+                <p class="mt-1">Desenvolvido com foco em decisões rápidas e priorização visual de problemas.</p>
+            </div>
+            <p>&copy; 2026 Todos os direitos reservados.</p>
+        </div>
+    </footer>
+
+    <!-- Modal para Adicionar/Simular Entrega -->
+    <div id="add-delivery-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-white rounded-xl shadow-xl max-w-md w-full overflow-hidden transform transition-all">
+            <div class="bg-indigo-900 text-white px-6 py-4 flex justify-between items-center">
+                <h3 class="font-bold flex items-center gap-2">
+                    <i data-lucide="plus-circle" class="w-5 h-5"></i>
+                    Simular Nova Entrega
+                </h3>
+                <button onclick="closeModal()" class="text-indigo-200 hover:text-white transition-colors">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+            <form id="add-delivery-form" class="p-6 space-y-4" onsubmit="handleNewDelivery(event)">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">ID da Entrega (Único)</label>
+                    <input type="number" id="new-id" required class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Ex: 311">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Transportadora</label>
+                    <select id="new-carrier" required class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option value="RotaMax">RotaMax</option>
+                        <option value="ViaCargo">ViaCargo</option>
+                        <option value="FlashLog">FlashLog</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Região</label>
+                    <select id="new-region" required class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option value="Sudeste">Sudeste</option>
+                        <option value="Sul">Sul</option>
+                        <option value="Nordeste">Nordeste</option>
+                        <option value="Norte">Norte</option>
+                        <option value="Centro-Oeste">Centro-Oeste</option>
+                    </select>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Prazo (Dias)</label>
+                        <input type="number" id="new-limit" min="1" required class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Ex: 5">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Dias Reais de Trânsito</label>
+                        <input type="number" id="new-real" min="1" required class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Ex: 8">
+                    </div>
+                </div>
+                <div class="pt-4 border-t border-gray-100 flex justify-end gap-3">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 text-sm transition-all">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold transition-all shadow-sm">Guardar Entrega</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Script de Configuração e Lógica de Negócio -->
+    <script>
+        // Base de dados fornecida no PDF
+        let deliveriesDataset = [
+            { id: 301, carrier: "RotaMax", region: "Sudeste", limitDays: 3, realDays: 7 },
+            { id: 302, carrier: "ViaCargo", region: "Sul", limitDays: 5, realDays: 5 },
+            { id: 303, carrier: "FlashLog", region: "Nordeste", limitDays: 4, realDays: 9 },
+            { id: 304, carrier: "RotaMax", region: "Norte", limitDays: 6, realDays: 4 },
+            { id: 305, carrier: "ViaCargo", region: "Centro-Oeste", limitDays: 2, realDays: 6 },
+            { id: 306, carrier: "FlashLog", region: "Sul", limitDays: 5, realDays: 12 },
+            { id: 307, carrier: "RotaMax", region: "Sul", limitDays: 6, realDays: 9 },
+            { id: 308, carrier: "ViaCargo", region: "Sudeste", limitDays: 3, realDays: 4 },
+            { id: 309, carrier: "FlashLog", region: "Norte", limitDays: 5, realDays: 5 },
+            { id: 310, carrier: "ViaCargo", region: "Nordeste", limitDays: 4, realDays: 8 }
+        ];
+
+        // Instâncias dos gráficos globais
+        let chartCarriersInstance = null;
+        let chartRegionsInstance = null;
+
+        // Ao carregar o DOM
+        window.onload = function() {
+            // Inicializar ícones da biblioteca Lucide
+            lucide.createIcons();
+
+            // Configurar Data Atual no Header
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            document.getElementById('date-time').innerText = new Date().toLocaleDateString('pt-PT', options);
+
+            // Ouvintes de eventos nos filtros
+            document.getElementById('filter-carrier').addEventListener('change', updateDashboard);
+            document.getElementById('filter-region').addEventListener('change', updateDashboard);
+            document.getElementById('filter-status').addEventListener('change', updateDashboard);
+            document.getElementById('table-search').addEventListener('input', updateDashboard);
+
+            // Executar primeira atualização de dados e renderização do painel
+            updateDashboard();
+        };
+
+        // Modal Controls
+        function openModal() {
+            // Sugere um ID único livre
+            const maxId = deliveriesDataset.reduce((max, d) => d.id > max ? d.id : max, 300);
+            document.getElementById('new-id').value = maxId + 1;
+            
+            const modal = document.getElementById('add-delivery-modal');
+            modal.classList.remove('hidden');
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('add-delivery-modal');
+            modal.classList.add('hidden');
+            document.getElementById('add-delivery-form').reset();
+        }
+
+        // Submissão de nova entrega
+        function handleNewDelivery(event) {
+            event.preventDefault();
+
+            const id = parseInt(document.getElementById('new-id').value);
+            const carrier = document.getElementById('new-carrier').value;
+            const region = document.getElementById('new-region').value;
+            const limitDays = parseInt(document.getElementById('new-limit').value);
+            const realDays = parseInt(document.getElementById('new-real').value);
+
+            // Verificação de ID duplicado
+            if (deliveriesDataset.some(item => item.id === id)) {
+                alert(`O ID de entrega ${id} já existe!`);
+                return;
+            }
+
+            // Adicionar elemento ao dataset
+            deliveriesDataset.push({ id, carrier, region, limitDays, realDays });
+
+            // Fechar modal e atualizar dashboards em tempo real
+            closeModal();
+            updateDashboard();
+        }
+
+        // Eliminar registo do dataset simulado
+        function deleteDelivery(id) {
+            deliveriesDataset = deliveriesDataset.filter(d => d.id !== id);
+            updateDashboard();
+        }
+
+        // Processa, analisa e atualiza todas as visualizações do Dashboard
+        function updateDashboard() {
+            // 1. Capturar filtros selecionados
+            const selCarrier = document.getElementById('filter-carrier').value;
+            const selRegion = document.getElementById('filter-region').value;
+            const selStatus = document.getElementById('filter-status').value;
+            const searchText = document.getElementById('table-search').value.toLowerCase();
+
+            // 2. Filtragem do dataset
+            const filteredData = deliveriesDataset.filter(item => {
+                const isCarrierMatch = (selCarrier === 'all' || item.carrier === selCarrier);
+                const isRegionMatch = (selRegion === 'all' || item.region === selRegion);
+                
+                const isDelayed = item.realDays > item.limitDays;
+                const isStatusMatch = (selStatus === 'all' || 
+                                       (selStatus === 'delayed' && isDelayed) || 
+                                       (selStatus === 'ontime' && !isDelayed));
+
+                const isSearchMatch = (
+                    item.id.toString().includes(searchText) ||
+                    item.carrier.toLowerCase().includes(searchText) ||
+                    item.region.toLowerCase().includes(searchText)
+                );
+
+                return isCarrierMatch && isRegionMatch && isStatusMatch && isSearchMatch;
+            });
+
+            // 3. Processamento das Estatísticas & Métricas (KPIs)
+            calculateKPIs(filteredData);
+
+            // 4. Renderizar Alertas Visuais para Priorização Operacional
+            generateAlerts(filteredData);
+
+            // 5. Renderizar Gráficos Dinâmicos
+            renderCarrierChart(filteredData);
+            renderRegionChart(filteredData);
+
+            // 6. Atualizar Rankings de Severidade e Desempenho
+            updateRankings(filteredData);
+
+            // 7. Atualizar Tabela Dinâmica
+            renderTable(filteredData);
+        }
+
+        // Cálculo de KPIs
+        function calculateKPIs(data) {
+            const total = data.length;
+            let delayedCount = 0;
+            let totalDeviation = 0;
+
+            data.forEach(item => {
+                const isDelayed = item.realDays > item.limitDays;
+                if (isDelayed) {
+                    delayedCount++;
+                }
+                // Desvio (Diferença entre dias reais e prazo definido)
+                totalDeviation += (item.realDays - item.limitDays);
+            });
+
+            const onTimePct = total > 0 ? (((total - delayedCount) / total) * 100).toFixed(0) : 0;
+            const delayedPct = total > 0 ? ((delayedCount / total) * 100).toFixed(0) : 0;
+            const avgDelay = total > 0 ? (totalDeviation / total).toFixed(1) : 0;
+
+            // Atribuição ao DOM
+            document.getElementById('kpi-total').innerText = total;
+            document.getElementById('kpi-delayed').innerText = delayedCount;
+            document.getElementById('kpi-delayed-pct').innerText = `${delayedPct}% do total ativo`;
+            document.getElementById('kpi-ontime').innerText = `${onTimePct}%`;
+            document.getElementById('kpi-avg-delay').innerText = `${avgDelay > 0 ? '+' : ''}${avgDelay}d`;
+        }
+
+        // Geração de alertas visuais críticos (Priorização Operacional)
+        function generateAlerts(data) {
+            const alertBox = document.getElementById('critical-alerts');
+            const listContainer = document.getElementById('alerts-list');
+            listContainer.innerHTML = '';
+
+            // Filtrar entregas com atraso crítico (atraso maior que 3 dias do prazo estipulado)
+            const criticalDeliveries = data.filter(item => (item.realDays - item.limitDays) >= 3);
+
+            if (criticalDeliveries.length > 0) {
+                alertBox.classList.remove('hidden');
+                criticalDeliveries.forEach(item => {
+                    const diff = item.realDays - item.limitDays;
+                    const p = document.createElement('p');
+                    p.className = "flex items-center gap-1.5";
+                    p.innerHTML = `<span class="inline-block w-1.5 h-1.5 bg-red-600 rounded-full"></span> 
+                        <strong>Entrega #${item.id}</strong> na região <strong>${item.region}</strong> (${item.carrier}) 
+                        com desvio grave de <span class="underline font-bold">${diff} dias</span>.`;
+                    listContainer.appendChild(p);
+                });
+            } else {
+                alertBox.classList.add('hidden');
+            }
+        }
+
+        // Gráfico de Atrasos Médios por Transportadora (Desvio de dias)
+        function renderCarrierChart(data) {
+            // Estruturação dos dados
+            const carrierStats = {};
+            // Garantir que as transportadoras originais aparecem mesmo sem dados no filtro
+            ["RotaMax", "ViaCargo", "FlashLog"].forEach(c => {
+                carrierStats[c] = { totalDeviation: 0, count: 0 };
+            });
+
+            data.forEach(item => {
+                if (!carrierStats[item.carrier]) {
+                    carrierStats[item.carrier] = { totalDeviation: 0, count: 0 };
+                }
+                // Desvio (positivo = atrasado, zero/negativo = adiantado ou no prazo)
+                const desvio = item.realDays - item.limitDays;
+                carrierStats[item.carrier].totalDeviation += desvio;
+                carrierStats[item.carrier].count++;
+            });
+
+            const labels = Object.keys(carrierStats);
+            const values = labels.map(label => {
+                const stat = carrierStats[label];
+                return stat.count > 0 ? (stat.totalDeviation / stat.count).toFixed(2) : 0;
+            });
+
+            if (chartCarriersInstance) {
+                chartCarriersInstance.destroy();
+            }
+
+            const ctx = document.getElementById('chart-carriers').getContext('2d');
+            chartCarriersInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Desvio Médio (Dias)',
+                        data: values,
+                        backgroundColor: values.map(val => val > 0 ? 'rgba(239, 68, 68, 0.85)' : 'rgba(16, 185, 129, 0.85)'),
+                        borderColor: values.map(val => val > 0 ? 'rgb(220, 38, 38)' : 'rgb(5, 150, 105)'),
+                        borderWidth: 1.5,
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Dias de Diferença' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Gráfico de Estado das Entregas por Região (Volume de Atrasos vs No Prazo)
+        function renderRegionChart(data) {
+            const regions = ["Sudeste", "Sul", "Nordeste", "Norte", "Centro-Oeste"];
+            const onTimeCounts = regions.map(() => 0);
+            const delayedCounts = regions.map(() => 0);
+
+            data.forEach(item => {
+                const regIndex = regions.indexOf(item.region);
+                if (regIndex !== -1) {
+                    if (item.realDays > item.limitDays) {
+                        delayedCounts[regIndex]++;
+                    } else {
+                        onTimeCounts[regIndex]++;
+                    }
+                }
+            });
+
+            if (chartRegionsInstance) {
+                chartRegionsInstance.destroy();
+            }
+
+            const ctx = document.getElementById('chart-regions').getContext('2d');
+            chartRegionsInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: regions,
+                    datasets: [
+                        {
+                            label: 'No Prazo',
+                            data: onTimeCounts,
+                            backgroundColor: 'rgba(16, 185, 129, 0.8)',
+                            borderColor: 'rgb(16, 185, 129)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Em Atraso',
+                            data: delayedCounts,
+                            backgroundColor: 'rgba(239, 68, 68, 0.8)',
+                            borderColor: 'rgb(239, 68, 68)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { stacked: true },
+                        y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 } }
+                    }
+                }
+            });
+        }
+
+        // Rankings e Severidade
+        function updateRankings(data) {
+            // 1. Ranking de Transportadoras Críticas (Ordenado pela taxa de atraso)
+            const carriers = ["RotaMax", "ViaCargo", "FlashLog"];
+            const carrierStats = carriers.map(c => {
+                const carrierData = data.filter(item => item.carrier === c);
+                const total = carrierData.length;
+                const delayed = carrierData.filter(item => item.realDays > item.limitDays).length;
+                const delayRate = total > 0 ? (delayed / total) * 100 : 0;
+                return { name: c, delayRate: delayRate, total, delayed };
+            }).sort((a, b) => b.delayRate - a.delayRate); // Ordem decrescente
+
+            const rankContainer = document.getElementById('carrier-ranking-list');
+            rankContainer.innerHTML = '';
+
+            carrierStats.forEach(stat => {
+                const div = document.createElement('div');
+                div.className = "flex items-center justify-between border-b border-gray-100 pb-3 last:border-0 last:pb-0";
+
+                const colorClass = stat.delayRate > 50 ? 'text-red-600 font-semibold' : 'text-amber-600';
+
+                div.innerHTML = `
+                    <div>
+                        <p class="text-sm font-semibold text-gray-800">${stat.name}</p>
+                        <p class="text-xs text-gray-400">${stat.delayed} de ${stat.total} entregas com desvio</p>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-sm ${colorClass}">${stat.delayRate.toFixed(0)}% de Atraso</span>
+                        <div class="w-24 bg-gray-100 h-1.5 rounded-full mt-1 overflow-hidden">
+                            <div class="bg-red-500 h-1.5 rounded-full" style="width: ${stat.delayRate}%"></div>
+                        </div>
+                    </div>
+                `;
+                rankContainer.appendChild(div);
+            });
+
+            // 2. Termómetro de Severidade por Região (Total de dias acumulados em atraso por região)
+            const regions = ["Sudeste", "Sul", "Nordeste", "Norte", "Centro-Oeste"];
+            const regionStats = regions.map(reg => {
+                const regData = data.filter(item => item.region === reg);
+                // Apenas desvios superiores a zero
+                const totalDelayDays = regData.reduce((acc, current) => {
+                    const delay = current.realDays - current.limitDays;
+                    return acc + (delay > 0 ? delay : 0);
+                }, 0);
+                return { region: reg, totalDelayDays };
+            }).sort((a, b) => b.totalDelayDays - a.totalDelayDays);
+
+            const maxDelayDays = Math.max(...regionStats.map(r => r.totalDelayDays), 1);
+
+            const regionContainer = document.getElementById('region-severity-list');
+            regionContainer.innerHTML = '';
+
+            regionStats.forEach(stat => {
+                const pct = (stat.totalDelayDays / maxDelayDays) * 100;
+                const barColor = stat.totalDelayDays > 5 ? 'bg-red-500' : (stat.totalDelayDays > 0 ? 'bg-amber-500' : 'bg-emerald-500');
+
+                const div = document.createElement('div');
+                div.className = "space-y-1";
+                div.innerHTML = `
+                    <div class="flex justify-between text-xs font-semibold">
+                        <span class="text-gray-700">${stat.region}</span>
+                        <span class="text-gray-500">${stat.totalDelayDays} dias cumulativos</span>
+                    </div>
+                    <div class="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                        <div class="${barColor} h-2 rounded-full" style="width: ${pct}%"></div>
+                    </div>
+                `;
+                regionContainer.appendChild(div);
+            });
+        }
+
+        // Desenhar e alimentar a tabela dinâmica de entregas
+        function renderTable(data) {
+            const tableBody = document.getElementById('deliveries-table-body');
+            tableBody.innerHTML = '';
+
+            data.forEach(item => {
+                const diff = item.realDays - item.limitDays;
+                const isDelayed = diff > 0;
+                const isCritical = diff >= 3;
+
+                // Definir Classes de Estilo para a Linha (Destaques Automáticos)
+                let rowBgClass = 'hover:bg-gray-50 transition-colors';
+                if (isCritical) {
+                    rowBgClass = 'bg-red-50 hover:bg-red-100/70 transition-colors';
+                }
+
+                const tr = document.createElement('tr');
+                tr.className = rowBgClass;
+
+                tr.innerHTML = `
+                    <td class="px-6 py-4 font-semibold text-gray-900">#${item.id}</td>
+                    <td class="px-6 py-4">
+                        <div class="flex items-center gap-2">
+                            <div class="w-2.5 h-2.5 rounded-full bg-indigo-400"></div>
+                            <span>${item.carrier}</span>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-gray-600">${item.region}</td>
+                    <td class="px-6 py-4 text-center">${item.limitDays} dias</td>
+                    <td class="px-6 py-4 text-center font-medium">${item.realDays} dias</td>
+                    <td class="px-6 py-4 text-center">
+                        <span class="font-bold ${diff > 0 ? 'text-red-600' : 'text-emerald-600'}">
+                            ${diff > 0 ? `+${diff}` : diff}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                            isDelayed 
+                            ? 'bg-red-100 text-red-800' 
+                            : 'bg-emerald-100 text-emerald-800'
+                        }">
+                            <span class="w-1.5 h-1.5 rounded-full ${isDelayed ? 'bg-red-500' : 'bg-emerald-500'}"></span>
+                            ${isDelayed ? 'Em Atraso' : 'No Prazo'}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-right">
+                        <button onclick="deleteDelivery(${item.id})" class="text-gray-400 hover:text-red-500 p-1 rounded-lg transition-colors" title="Remover registo">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                    </td>
+                `;
+                tableBody.appendChild(tr);
+            });
+
+            // Recriar ícones dinâmicos da tabela
+            lucide.createIcons();
+
+            // Atualizar contador da tabela
+            document.getElementById('table-counter').innerText = `A mostrar ${data.length} de ${deliveriesDataset.length} registos`;
+        }
+    </script>
+</body>
+</html>
